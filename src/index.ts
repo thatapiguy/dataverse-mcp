@@ -792,6 +792,79 @@ server.tool(
   }
 );
 
+// PowerPlatform record tools
+
+// Create record tool
+server.tool(
+  "create-record",
+  "Create a new record in a PowerPlatform entity",
+  {
+    entityNamePlural: z.string().describe("The plural name of the entity (e.g., 'accounts', 'contacts')"),
+    data: z.object({}).passthrough().describe("The record data to create"),
+  },
+  async ({ entityNamePlural, data }) => {
+    try {
+      const service = getPowerPlatformService();
+      const record = await service.createRecord(entityNamePlural, data);
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully created record in '${entityNamePlural}':\n\n${JSON.stringify(record, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error("Error creating record:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to create record: ${error.message}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Update record tool
+server.tool(
+  "update-record",
+  "Update an existing record in a PowerPlatform entity",
+  {
+    entityNamePlural: z.string().describe("The plural name of the entity (e.g., 'accounts', 'contacts')"),
+    recordId: z.string().describe("The GUID of the record to update"),
+    data: z.object({}).passthrough().describe("The record data to update"),
+  },
+  async ({ entityNamePlural, recordId, data }) => {
+    try {
+      const service = getPowerPlatformService();
+      const record = await service.updateRecord(entityNamePlural, recordId, data);
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully updated record in '${entityNamePlural}':\n\n${JSON.stringify(record, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error("Error updating record:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to update record: ${error.message}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);

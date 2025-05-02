@@ -260,4 +260,68 @@ export class PowerPlatformService {
   async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<ApiCollectionResponse<any>> {
     return this.makeRequest<ApiCollectionResponse<any>>(`api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`);
   }
+
+  /**
+   * Create a new record
+   * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
+   * @param data The record data to create
+   * @returns The created record data
+   */
+  async createRecord(entityNamePlural: string, data: any): Promise<any> {
+    try {
+      const token = await this.getAccessToken();
+
+      const response = await axios({
+        method: 'POST',
+        url: `${this.config.organizationUrl}/api/data/v9.2/${entityNamePlural}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0',
+          'Prefer': 'return=representation'
+        },
+        data: data
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create record:', error);
+      throw new Error(`Failed to create record: ${error}`);
+    }
+  }
+
+  /**
+   * Update an existing record
+   * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
+   * @param recordId The GUID of the record to update
+   * @param data The record data to update
+   * @returns The updated record data
+   */
+  async updateRecord(entityNamePlural: string, recordId: string, data: any): Promise<any> {
+    try {
+      const token = await this.getAccessToken();
+
+      const response = await axios({
+        method: 'PATCH',
+        url: `${this.config.organizationUrl}/api/data/v9.2/${entityNamePlural}(${recordId})`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0',
+          'If-Match': '*', // Optimistic concurrency
+          'Prefer': 'return=representation'
+        },
+        data: data
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to update record:', error);
+      throw new Error(`Failed to update record: ${error}`);
+    }
+  }
 }

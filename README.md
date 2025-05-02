@@ -8,6 +8,7 @@ Key features:
 - Comprehensive relationship mapping and visualization
 - AI-assisted query building and data modeling through AI agent
 - Full access to entity attributes, relationships, and global option sets
+- Create, read, update, and query records
 
 ## Installation
 
@@ -58,7 +59,38 @@ This is an MCP server designed to work with MCP-compatible clients like Cursor, 
 - `get-global-option-set`: Get a global option set definition
 - `get-record`: Get a specific record by entity name and ID
 - `query-records`: Query records using an OData filter expression
+- `create-record`: Create a new record for a PowerPlatform entity
+- `update-record`: Update an existing record for a PowerPlatform entity
 - `use-powerplatform-prompt`: Use pre-defined prompt templates for PowerPlatform entities
+
+### Reading Records
+
+```typescript
+// Query records
+const records = await service.queryRecords('accounts', "name eq 'Test Account'", 50);
+
+// Get specific record
+const record = await service.getRecord('accounts', '00000000-0000-0000-0000-000000000001');
+```
+
+### Creating Records
+
+```typescript
+const newRecord = await service.createRecord('accounts', {
+  name: 'New Account',
+  telephone1: '555-0123',
+  revenue: 1000000
+});
+```
+
+### Updating Records
+
+```typescript
+const updatedRecord = await service.updateRecord('accounts', '00000000-0000-0000-0000-000000000001', {
+  revenue: 2000000,
+  description: 'Updated description'
+});
+```
 
 ## MCP Prompts
 
@@ -349,6 +381,14 @@ Try updating your query to use 'customertype' instead of 'customertypecode'.
 ```
 
 These examples show how AI assistant can leverage the MCP prompts to provide context-aware, accurate assistance for PowerPlatform development tasks. The AI understands your environment's specific configuration and can help with both simple queries and complex architectural decisions.
+
+## Testing
+
+Run the test suite:
+
+```bash
+npm test
+```
 
 ## License
 
