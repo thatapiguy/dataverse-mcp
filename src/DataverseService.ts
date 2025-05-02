@@ -262,15 +262,65 @@ export class DataverseService {
   }
 
   /**
+   * Query records with pagination support
+   * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
+   * @param filter OData filter expression (e.g., "name eq 'test'")
+   * @param maxRecords Maximum number of records to retrieve per page (default: 50)
+   * @param continuationToken Optional URL to get the next page of records
+   * @returns Object containing records and next page URL if available
+   */
+  async queryRecordsWithPagination(
+    entityNamePlural: string, 
+    filter: string, 
+    maxRecords: number = 50,
+    continuationToken?: string
+  ): Promise<{
+    value: any[],
+    nextPageUrl?: string
+  }> {
+    try {
+      const token = await this.getAccessToken();
+      const url = continuationToken || `${this.config.organizationUrl}/api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`;
+
+      const response = await axios({
+        method: 'GET',
+        url,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        }
+      });
+
+      return {
+        value: response.data.value,
+        nextPageUrl: response.data['@odata.nextLink']
+      };
+    } catch (error) {
+      console.error('Failed to query records:', error);
+      throw new Error(`Failed to query records: ${error}`);
+    }
+  }
+
+  /**
    * Create a new record
    * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
    * @param data The record data to create
    * @returns The created record data
    */
   async createRecord(entityNamePlural: string, data: any): Promise<any> {
+    if (!entityNamePlural) {
+      throw new Error('Entity name is required');
+    }
+    
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be a valid object');
+    }
+
     try {
       const token = await this.getAccessToken();
-
+      
       const response = await axios({
         method: 'POST',
         url: `${this.config.organizationUrl}/api/data/v9.2/${entityNamePlural}`,
@@ -282,13 +332,14 @@ export class DataverseService {
           'OData-Version': '4.0',
           'Prefer': 'return=representation'
         },
-        data: data
+        data
       });
 
       return response.data;
-    } catch (error) {
-      console.error('Failed to create record:', error);
-      throw new Error(`Failed to create record: ${error}`);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+      console.error('Failed to create record:', errorMessage);
+      throw new Error(`Failed to create record: ${errorMessage}`);
     }
   }
 
@@ -300,6 +351,18 @@ export class DataverseService {
    * @returns The updated record data
    */
   async updateRecord(entityNamePlural: string, recordId: string, data: any): Promise<any> {
+    if (!entityNamePlural) {
+      throw new Error('Entity name is required');
+    }
+
+    if (!recordId) {
+      throw new Error('Record ID is required');
+    }
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be a valid object');
+    }
+
     try {
       const token = await this.getAccessToken();
 
@@ -312,16 +375,17 @@ export class DataverseService {
           'Accept': 'application/json',
           'OData-MaxVersion': '4.0',
           'OData-Version': '4.0',
-          'If-Match': '*', // Optimistic concurrency
+          'If-Match': '*',
           'Prefer': 'return=representation'
         },
-        data: data
+        data
       });
 
       return response.data;
-    } catch (error) {
-      console.error('Failed to update record:', error);
-      throw new Error(`Failed to update record: ${error}`);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+      console.error('Failed to update record:', errorMessage);
+      throw new Error(`Failed to update record: ${errorMessage}`);
     }
   }
 }

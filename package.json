@@ -39,6 +39,7 @@
     "@azure/msal-node": "^3.3.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "axios": "^1.8.3",
+    "dotenv": "^16.5.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

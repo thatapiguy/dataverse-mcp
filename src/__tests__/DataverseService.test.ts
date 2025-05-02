@@ -106,4 +106,69 @@ describe('DataverseService', () => {
         .toThrow('Failed to update record: Error: Update failed');
     });
   });
+
+  describe('queryRecordsWithPagination', () => {
+    it('should handle pagination correctly', async () => {
+      const mockData = {
+        value: [{ id: '1' }, { id: '2' }],
+        '@odata.nextLink': 'https://test.crm.dynamics.com/api/data/v9.2/accounts?$skiptoken=123'
+      };
+
+      mockedAxios.mockResolvedValueOnce({ data: mockData });
+
+      const result = await service.queryRecordsWithPagination('accounts', "statecode eq 0", 50);
+
+      expect(mockedAxios).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://test.crm.dynamics.com/api/data/v9.2/accounts?$filter=statecode%20eq%200&$top=50',
+        headers: {
+          'Authorization': 'Bearer mock-token',
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        }
+      });
+
+      expect(result).toEqual({
+        value: mockData.value,
+        nextPageUrl: mockData['@odata.nextLink']
+      });
+    });
+
+    it('should use continuation token when provided', async () => {
+      const mockData = {
+        value: [{ id: '3' }, { id: '4' }]
+      };
+
+      const continuationToken = 'https://test.crm.dynamics.com/api/data/v9.2/accounts?$skiptoken=123';
+      mockedAxios.mockResolvedValueOnce({ data: mockData });
+
+      const result = await service.queryRecordsWithPagination('accounts', "statecode eq 0", 50, continuationToken);
+
+      expect(mockedAxios).toHaveBeenCalledWith({
+        method: 'GET',
+        url: continuationToken,
+        headers: {
+          'Authorization': 'Bearer mock-token',
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        }
+      });
+
+      expect(result).toEqual({
+        value: mockData.value,
+        nextPageUrl: undefined
+      });
+    });
+
+    it('should handle errors', async () => {
+      const mockError = new Error('Query failed');
+      mockedAxios.mockRejectedValueOnce(mockError);
+
+      await expect(service.queryRecordsWithPagination('accounts', "statecode eq 0"))
+        .rejects
+        .toThrow('Failed to query records: Error: Query failed');
+    });
+  });
 });

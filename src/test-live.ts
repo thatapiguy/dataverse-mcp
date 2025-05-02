@@ -34,10 +34,10 @@ async function testLiveEnvironment() {
     // Create a new account
     console.log('Creating new account...');
     const newAccount = await service.createRecord('accounts', {
-      name: 'Test Account ' + new Date().toISOString(),
-      telephone1: '555-0123',
-      emailaddress1: 'test@example.com',
-      description: 'Created by Dataverse MCP test'
+      name: 'Hitachi Solutions',
+      description: 'Global consulting and IT services company',
+      websiteurl: 'https://www.hitachi-solutions.com',
+      industrycode: 1 // Consulting
     });
     
     console.log('Created account:', newAccount);
