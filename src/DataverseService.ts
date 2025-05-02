@@ -1,7 +1,7 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import axios from 'axios';
 
-export interface PowerPlatformConfig {
+export interface DataverseConfig {
   organizationUrl: string;
   clientId: string;
   clientSecret: string;
@@ -14,13 +14,13 @@ export interface ApiCollectionResponse<T> {
   [key: string]: any; // For any additional properties
 }
 
-export class PowerPlatformService {
-  private config: PowerPlatformConfig;
+export class DataverseService {
+  private config: DataverseConfig;
   private msalClient: ConfidentialClientApplication;
   private accessToken: string | null = null;
   private tokenExpirationTime: number = 0;
 
-  constructor(config: PowerPlatformConfig) {
+  constructor(config: DataverseConfig) {
     this.config = config;
     
     // Initialize MSAL client
@@ -34,7 +34,7 @@ export class PowerPlatformService {
   }
 
   /**
-   * Get an access token for the PowerPlatform API
+   * Get an access token for the Dataverse API
    */
   private async getAccessToken(): Promise<string> {
     const currentTime = Date.now();
@@ -69,7 +69,7 @@ export class PowerPlatformService {
   }
 
   /**
-   * Make an authenticated request to the PowerPlatform API
+   * Make an authenticated request to the Dataverse API
    */
   private async makeRequest<T>(endpoint: string): Promise<T> {
     try {
@@ -88,8 +88,8 @@ export class PowerPlatformService {
 
       return response.data as T;
     } catch (error) {
-      console.error('PowerPlatform API request failed:', error);
-      throw new Error(`PowerPlatform API request failed: ${error}`);
+      console.error('Dataverse API request failed:', error);
+      throw new Error(`Dataverse API request failed: ${error}`);
     }
   }
 

@@ -1,4 +1,4 @@
-import { PowerPlatformService, PowerPlatformConfig } from '../PowerPlatformService.js';
+import { DataverseService, DataverseConfig } from '../DataverseService.js';
 import axios, { AxiosInstance } from 'axios';
 
 // Mock axios
@@ -15,9 +15,9 @@ jest.mock('@azure/msal-node', () => ({
   }))
 }));
 
-describe('PowerPlatformService', () => {
-  let service: PowerPlatformService;
-  const mockConfig: PowerPlatformConfig = {
+describe('DataverseService', () => {
+  let service: DataverseService;
+  const mockConfig: DataverseConfig = {
     organizationUrl: 'https://test.crm.dynamics.com',
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
@@ -25,7 +25,7 @@ describe('PowerPlatformService', () => {
   };
 
   beforeEach(() => {
-    service = new PowerPlatformService(mockConfig);
+    service = new DataverseService(mockConfig);
     jest.clearAllMocks();
   });
 

@@ -1,54 +1,59 @@
 #!/usr/bin/env node
+
+import { config } from 'dotenv';
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { PowerPlatformService, PowerPlatformConfig } from "./PowerPlatformService.js";
+import { z } from 'zod';
+import { DataverseService, DataverseConfig } from './DataverseService.js';
+
+// Load environment variables from .env file
+config();
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'DATAVERSE_URL',
+  'DATAVERSE_CLIENT_ID',
+  'DATAVERSE_CLIENT_SECRET',
+  'DATAVERSE_TENANT_ID'
+] as const;
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Error: ${envVar} is not set in environment variables`);
+    console.error('Please create a .env file based on .env.template');
+    process.exit(1);
+  }
+}
 
 // Environment configuration
-// These values can be set in environment variables or loaded from a configuration file
-const POWERPLATFORM_CONFIG: PowerPlatformConfig = {
-  organizationUrl: process.env.POWERPLATFORM_URL || "",
-  clientId: process.env.POWERPLATFORM_CLIENT_ID || "",
-  clientSecret: process.env.POWERPLATFORM_CLIENT_SECRET || "",
-  tenantId: process.env.POWERPLATFORM_TENANT_ID || "",
+const DATAVERSE_CONFIG: DataverseConfig = {
+  organizationUrl: process.env.DATAVERSE_URL!,
+  clientId: process.env.DATAVERSE_CLIENT_ID!,
+  clientSecret: process.env.DATAVERSE_CLIENT_SECRET!,
+  tenantId: process.env.DATAVERSE_TENANT_ID!,
 };
 
 // Create server instance
 const server = new McpServer({
-  name: "powerplatform-mcp",
+  name: "dataverse-mcp",
   version: "1.0.0",
 });
 
-let powerPlatformService: PowerPlatformService | null = null;
+let dataverseService: DataverseService | null = null;
 
-// Function to initialize PowerPlatformService on demand
-function getPowerPlatformService(): PowerPlatformService {
-  if (!powerPlatformService) {
-    // Check if configuration is complete
-    const missingConfig: string[] = [];
-    if (!POWERPLATFORM_CONFIG.organizationUrl) missingConfig.push("organizationUrl");
-    if (!POWERPLATFORM_CONFIG.clientId) missingConfig.push("clientId");
-    if (!POWERPLATFORM_CONFIG.clientSecret) missingConfig.push("clientSecret");
-    if (!POWERPLATFORM_CONFIG.tenantId) missingConfig.push("tenantId");
-    
-    if (missingConfig.length > 0) {
-      throw new Error(`Missing PowerPlatform configuration: ${missingConfig.join(", ")}. Set these in environment variables.`);
-    }
-    
-    // Initialize service
-    powerPlatformService = new PowerPlatformService(POWERPLATFORM_CONFIG);
-    console.error("PowerPlatform service initialized");
+// Function to initialize DataverseService on demand
+function getDataverseService(): DataverseService {
+  if (!dataverseService) {
+    dataverseService = new DataverseService(DATAVERSE_CONFIG);
   }
-  
-  return powerPlatformService;
+  return dataverseService;
 }
 
-// Pre-defined PowerPlatform Prompts
-const powerPlatformPrompts = {
-  // Entity exploration prompts
+// Pre-defined Dataverse Prompts
+const dataversePrompts = {
   ENTITY_OVERVIEW: (entityName: string) => 
-    `## Power Platform Entity: ${entityName}\n\n` +
-    `This is an overview of the '${entityName}' entity in Microsoft Power Platform/Dataverse:\n\n` +
+    `## Dataverse Entity: ${entityName}\n\n` +
+    `This is an overview of the '${entityName}' entity in Microsoft Dataverse:\n\n` +
     `### Entity Details\n{{entity_details}}\n\n` +
     `### Attributes\n{{key_attributes}}\n\n` +
     `### Relationships\n{{relationships}}\n\n` +
@@ -63,7 +68,6 @@ const powerPlatformPrompts = {
     `- Required: {{required}}\n` +
     `- Max Length: {{max_length}}`,
 
-  // Query builder prompts
   QUERY_TEMPLATE: (entityNamePlural: string) =>
     `## OData Query Template for ${entityNamePlural}\n\n` +
     `Use this template to build queries against the ${entityNamePlural} entity:\n\n` +
@@ -74,7 +78,6 @@ const powerPlatformPrompts = {
     `- Greater than date: \`createdon gt 2023-01-01T00:00:00Z\`\n` +
     `- Multiple conditions: \`name eq 'Contoso' and statecode eq 0\``,
 
-  // Relationship exploration prompts
   RELATIONSHIP_MAP: (entityName: string) =>
     `## Relationship Map for ${entityName}\n\n` +
     `This shows all relationships for the '${entityName}' entity:\n\n` +
@@ -84,32 +87,28 @@ const powerPlatformPrompts = {
 };
 
 // Register prompts with the server using the correct method signature
-// Entity Overview Prompt
 server.prompt(
   "entity-overview", 
-  "Get an overview of a Power Platform entity",
+  "Get an overview of a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity")
   },
   async (args) => {
     try {
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const entityName = args.entityName;
       
-      // Get entity metadata and key attributes
       const [metadata, attributes] = await Promise.all([
         service.getEntityMetadata(entityName),
         service.getEntityAttributes(entityName)
       ]);
       
-      // Format entity details
       const entityDetails = `- Display Name: ${metadata.DisplayName?.UserLocalizedLabel?.Label || entityName}\n` +
         `- Schema Name: ${metadata.SchemaName}\n` +
         `- Description: ${metadata.Description?.UserLocalizedLabel?.Label || 'No description'}\n` +
         `- Primary Key: ${metadata.PrimaryIdAttribute}\n` +
         `- Primary Name: ${metadata.PrimaryNameAttribute}`;
         
-      // Get key attributes
       const keyAttributes = attributes.value
         .map((attr: any) => {
           const attrType = attr["@odata.type"] || attr.odata?.type || "Unknown type";
@@ -117,7 +116,6 @@ server.prompt(
         })
         .join('\n');
         
-      // Get relationships summary
       const relationships = await service.getEntityRelationships(entityName);
       const oneToManyCount = relationships.oneToMany.value.length;
       const manyToManyCount = relationships.manyToMany.value.length;
@@ -125,7 +123,7 @@ server.prompt(
       const relationshipsSummary = `- One-to-Many Relationships: ${oneToManyCount}\n` +
                                   `- Many-to-Many Relationships: ${manyToManyCount}`;
       
-      let promptContent = powerPlatformPrompts.ENTITY_OVERVIEW(entityName);
+      let promptContent = dataversePrompts.ENTITY_OVERVIEW(entityName);
       promptContent = promptContent
         .replace('{{entity_details}}', entityDetails)
         .replace('{{key_attributes}}', keyAttributes)
@@ -159,7 +157,6 @@ server.prompt(
   }
 );
 
-// Attribute Details Prompt
 server.prompt(
   "attribute-details",
   "Get detailed information about a specific entity attribute/field",
@@ -169,13 +166,11 @@ server.prompt(
   },
   async (args) => {
     try {
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const { entityName, attributeName } = args;
       
-      // Get attribute details
       const attribute = await service.getEntityAttribute(entityName, attributeName);
       
-      // Format attribute details
       const attrDetails = `- Display Name: ${attribute.DisplayName?.UserLocalizedLabel?.Label || attributeName}\n` +
         `- Description: ${attribute.Description?.UserLocalizedLabel?.Label || 'No description'}\n` +
         `- Type: ${attribute.AttributeType}\n` +
@@ -183,7 +178,7 @@ server.prompt(
         `- Is Required: ${attribute.RequiredLevel?.Value || 'No'}\n` +
         `- Is Searchable: ${attribute.IsValidForAdvancedFind || false}`;
         
-      let promptContent = powerPlatformPrompts.ATTRIBUTE_DETAILS(entityName, attributeName);
+      let promptContent = dataversePrompts.ATTRIBUTE_DETAILS(entityName, attributeName);
       promptContent = promptContent
         .replace('{{attribute_details}}', attrDetails)
         .replace('{{data_type}}', attribute.AttributeType)
@@ -218,31 +213,28 @@ server.prompt(
   }
 );
 
-// Query Template Prompt
 server.prompt(
   "query-template",
-  "Get a template for querying a Power Platform entity",
+  "Get a template for querying a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity"),
   },
   async (args) => {
     try {
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const entityName = args.entityName;
       
-      // Get entity metadata to determine plural name
       const metadata = await service.getEntityMetadata(entityName);
       const entityNamePlural = metadata.EntitySetName;
       
-      // Get a few important fields for the select example
       const attributes = await service.getEntityAttributes(entityName);
       const selectFields = attributes.value
         .filter((attr: any) => attr.IsValidForRead === true && !attr.AttributeOf)
-        .slice(0, 5) // Just take first 5 for example
+        .slice(0, 5)
         .map((attr: any) => attr.LogicalName)
         .join(',');
         
-      let promptContent = powerPlatformPrompts.QUERY_TEMPLATE(entityNamePlural);
+      let promptContent = dataversePrompts.QUERY_TEMPLATE(entityNamePlural);
       promptContent = promptContent
         .replace('{{selected_fields}}', selectFields)
         .replace('{{filter_conditions}}', `${metadata.PrimaryNameAttribute} eq 'Example'`)
@@ -277,34 +269,29 @@ server.prompt(
   }
 );
 
-// Relationship Map Prompt
 server.prompt(
   "relationship-map",
-  "Get a list of relationships for a Power Platform entity",
+  "Get a list of relationships for a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity"),
   },
   async (args) => {
     try {
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const entityName = args.entityName;
       
-      // Get relationships
       const relationships = await service.getEntityRelationships(entityName);
       
-      // Format one-to-many relationships where this entity is primary
       const oneToManyPrimary = relationships.oneToMany.value
         .filter((rel: any) => rel.ReferencingEntity !== entityName)
         .map((rel: any) => `- ${rel.SchemaName}: ${entityName} (1) → ${rel.ReferencingEntity} (N)`)
         .join('\n');
         
-      // Format one-to-many relationships where this entity is related
       const oneToManyRelated = relationships.oneToMany.value
         .filter((rel: any) => rel.ReferencingEntity === entityName)
         .map((rel: any) => `- ${rel.SchemaName}: ${rel.ReferencedEntity} (1) → ${entityName} (N)`)
         .join('\n');
         
-      // Format many-to-many relationships
       const manyToMany = relationships.manyToMany.value
         .map((rel: any) => {
           const otherEntity = rel.Entity1LogicalName === entityName ? rel.Entity2LogicalName : rel.Entity1LogicalName;
@@ -312,7 +299,7 @@ server.prompt(
         })
         .join('\n');
       
-      let promptContent = powerPlatformPrompts.RELATIONSHIP_MAP(entityName);
+      let promptContent = dataversePrompts.RELATIONSHIP_MAP(entityName);
       promptContent = promptContent
         .replace('{{one_to_many_primary}}', oneToManyPrimary || 'None found')
         .replace('{{one_to_many_related}}', oneToManyRelated || 'None found')
@@ -346,20 +333,17 @@ server.prompt(
   }
 );
 
-// PowerPlatform entity metadata
 server.tool(
   "get-entity-metadata",
-  "Get metadata about a PowerPlatform entity",
+  "Get metadata about a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity"),
   },
   async ({ entityName }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const metadata = await service.getEntityMetadata(entityName);
       
-      // Format the metadata as a string for text display
       const metadataStr = JSON.stringify(metadata, null, 2);
       
       return {
@@ -384,20 +368,17 @@ server.tool(
   }
 );
 
-// PowerPlatform entity attributes
 server.tool(
   "get-entity-attributes",
-  "Get attributes/fields of a PowerPlatform entity",
+  "Get attributes/fields of a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity"),
   },
   async ({ entityName }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const attributes = await service.getEntityAttributes(entityName);
       
-      // Format the attributes as a string for text display
       const attributesStr = JSON.stringify(attributes, null, 2);
       
       return {
@@ -422,21 +403,18 @@ server.tool(
   }
 );
 
-// PowerPlatform specific entity attribute
 server.tool(
   "get-entity-attribute",
-  "Get a specific attribute/field of a PowerPlatform entity",
+  "Get a specific attribute/field of a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity"),
     attributeName: z.string().describe("The logical name of the attribute")
   },
   async ({ entityName, attributeName }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const attribute = await service.getEntityAttribute(entityName, attributeName);
       
-      // Format the attribute as a string for text display
       const attributeStr = JSON.stringify(attribute, null, 2);
       
       return {
@@ -461,20 +439,17 @@ server.tool(
   }
 );
 
-// PowerPlatform entity relationships
 server.tool(
   "get-entity-relationships",
-  "Get relationships (one-to-many and many-to-many) for a PowerPlatform entity",
+  "Get relationships (one-to-many and many-to-many) for a Dataverse entity",
   {
     entityName: z.string().describe("The logical name of the entity"),
   },
   async ({ entityName }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const relationships = await service.getEntityRelationships(entityName);
       
-      // Format the relationships as a string for text display
       const relationshipsStr = JSON.stringify(relationships, null, 2);
       
       return {
@@ -499,7 +474,6 @@ server.tool(
   }
 );
 
-// PowerPlatform global option set
 server.tool(
   "get-global-option-set",
   "Get a global option set definition by name",
@@ -508,11 +482,9 @@ server.tool(
   },
   async ({ optionSetName }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const optionSet = await service.getGlobalOptionSet(optionSetName);
       
-      // Format the option set as a string for text display
       const optionSetStr = JSON.stringify(optionSet, null, 2);
       
       return {
@@ -537,7 +509,6 @@ server.tool(
   }
 );
 
-// PowerPlatform record by ID
 server.tool(
   "get-record",
   "Get a specific record by entity name (plural) and ID",
@@ -547,11 +518,9 @@ server.tool(
   },
   async ({ entityNamePlural, recordId }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const record = await service.getRecord(entityNamePlural, recordId);
       
-      // Format the record as a string for text display
       const recordStr = JSON.stringify(record, null, 2);
       
       return {
@@ -576,7 +545,6 @@ server.tool(
   }
 );
 
-// PowerPlatform query records with filter
 server.tool(
   "query-records",
   "Query records using an OData filter expression",
@@ -587,11 +555,9 @@ server.tool(
   },
   async ({ entityNamePlural, filter, maxRecords }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const records = await service.queryRecords(entityNamePlural, filter, maxRecords || 50);
       
-      // Format the records as a string for text display
       const recordsStr = JSON.stringify(records, null, 2);
       const recordCount = records.value?.length || 0;
       
@@ -617,10 +583,9 @@ server.tool(
   }
 );
 
-// PowerPlatform MCP Prompts
 server.tool(
-  "use-powerplatform-prompt",
-  "Use a predefined prompt template for PowerPlatform entities",
+  "use-dataverse-prompt",
+  "Use a predefined prompt template for Dataverse entities",
   {
     promptType: z.enum([
       "ENTITY_OVERVIEW", 
@@ -633,37 +598,31 @@ server.tool(
   },
   async ({ promptType, entityName, attributeName }) => {
     try {
-      // Get or initialize PowerPlatformService
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       
       let promptContent = "";
       let replacements: Record<string, string> = {};
       
       switch (promptType) {
         case "ENTITY_OVERVIEW": {
-          // Get entity metadata and key attributes
           const [metadata, attributes] = await Promise.all([
             service.getEntityMetadata(entityName),
             service.getEntityAttributes(entityName)
           ]);
           
-          // Format entity details
           const entityDetails = `- Display Name: ${metadata.DisplayName?.UserLocalizedLabel?.Label || entityName}\n` +
             `- Schema Name: ${metadata.SchemaName}\n` +
             `- Description: ${metadata.Description?.UserLocalizedLabel?.Label || 'No description'}\n` +
             `- Primary Key: ${metadata.PrimaryIdAttribute}\n` +
             `- Primary Name: ${metadata.PrimaryNameAttribute}`;
             
-          // Get key attributes
           const keyAttributes = attributes.value
-            //.slice(0, 10) // Limit to first 10 important attributes
             .map((attr: any) => {
                 const attrType = attr["@odata.type"] || attr.odata?.type || "Unknown type";
                 return `- ${attr.LogicalName}: ${attrType}`;
               })
             .join('\n');
             
-          // Get relationships summary
           const relationships = await service.getEntityRelationships(entityName);
           const oneToManyCount = relationships.oneToMany.value.length;
           const manyToManyCount = relationships.manyToMany.value.length;
@@ -671,7 +630,7 @@ server.tool(
           const relationshipsSummary = `- One-to-Many Relationships: ${oneToManyCount}\n` +
                                       `- Many-to-Many Relationships: ${manyToManyCount}`;
           
-          promptContent = powerPlatformPrompts.ENTITY_OVERVIEW(entityName);
+          promptContent = dataversePrompts.ENTITY_OVERVIEW(entityName);
           replacements = {
             '{{entity_details}}': entityDetails,
             '{{key_attributes}}': keyAttributes,
@@ -685,10 +644,8 @@ server.tool(
             throw new Error("attributeName is required for ATTRIBUTE_DETAILS prompt");
           }
           
-          // Get attribute details
           const attribute = await service.getEntityAttribute(entityName, attributeName);
           
-          // Format attribute details
           const attrDetails = `- Display Name: ${attribute.DisplayName?.UserLocalizedLabel?.Label || attributeName}\n` +
             `- Description: ${attribute.Description?.UserLocalizedLabel?.Label || 'No description'}\n` +
             `- Type: ${attribute.AttributeType}\n` +
@@ -696,7 +653,7 @@ server.tool(
             `- Is Required: ${attribute.RequiredLevel?.Value || 'No'}\n` +
             `- Is Searchable: ${attribute.IsValidForAdvancedFind || false}`;
             
-          promptContent = powerPlatformPrompts.ATTRIBUTE_DETAILS(entityName, attributeName);
+          promptContent = dataversePrompts.ATTRIBUTE_DETAILS(entityName, attributeName);
           replacements = {
             '{{attribute_details}}': attrDetails,
             '{{data_type}}': attribute.AttributeType,
@@ -707,18 +664,16 @@ server.tool(
         }
         
         case "QUERY_TEMPLATE": {
-          // Get entity metadata to determine plural name
           const metadata = await service.getEntityMetadata(entityName);
           const entityNamePlural = metadata.EntitySetName;
           
-          // Get a few important fields for the select example
           const attributes = await service.getEntityAttributes(entityName);
           const selectFields = attributes.value
-            .slice(0, 5) // Just take first 5 for example
+            .slice(0, 5)
             .map((attr: any) => attr.LogicalName)
             .join(',');
             
-          promptContent = powerPlatformPrompts.QUERY_TEMPLATE(entityNamePlural);
+          promptContent = dataversePrompts.QUERY_TEMPLATE(entityNamePlural);
           replacements = {
             '{{selected_fields}}': selectFields,
             '{{filter_conditions}}': `${metadata.PrimaryNameAttribute} eq 'Example'`,
@@ -729,33 +684,26 @@ server.tool(
         }
         
         case "RELATIONSHIP_MAP": {
-          // Get relationships
           const relationships = await service.getEntityRelationships(entityName);
           
-          // Format one-to-many relationships where this entity is primary
           const oneToManyPrimary = relationships.oneToMany.value
             .filter((rel: any) => rel.ReferencingEntity !== entityName)
-            //.slice(0, 10) // Limit to 10 for readability
             .map((rel: any) => `- ${rel.SchemaName}: ${entityName} (1) → ${rel.ReferencingEntity} (N)`)
             .join('\n');
             
-          // Format one-to-many relationships where this entity is related
           const oneToManyRelated = relationships.oneToMany.value
             .filter((rel: any) => rel.ReferencingEntity === entityName)
-            //.slice(0, 10) // Limit to 10 for readability
             .map((rel: any) => `- ${rel.SchemaName}: ${rel.ReferencedEntity} (1) → ${entityName} (N)`)
             .join('\n');
             
-          // Format many-to-many relationships
           const manyToMany = relationships.manyToMany.value
-            //.slice(0, 10) // Limit to 10 for readability
             .map((rel: any) => {
               const otherEntity = rel.Entity1LogicalName === entityName ? rel.Entity2LogicalName : rel.Entity1LogicalName;
               return `- ${rel.SchemaName}: ${entityName} (N) ↔ ${otherEntity} (N)`;
             })
             .join('\n');
           
-          promptContent = powerPlatformPrompts.RELATIONSHIP_MAP(entityName);
+          promptContent = dataversePrompts.RELATIONSHIP_MAP(entityName);
           replacements = {
             '{{one_to_many_primary}}': oneToManyPrimary || 'None found',
             '{{one_to_many_related}}': oneToManyRelated || 'None found',
@@ -765,7 +713,6 @@ server.tool(
         }
       }
       
-      // Replace all placeholders in the template
       for (const [placeholder, value] of Object.entries(replacements)) {
         promptContent = promptContent.replace(placeholder, value);
       }
@@ -779,12 +726,12 @@ server.tool(
         ],
       };
     } catch (error: any) {
-      console.error("Error using PowerPlatform prompt:", error);
+      console.error("Error using Dataverse prompt:", error);
       return {
         content: [
           {
             type: "text",
-            text: `Failed to use PowerPlatform prompt: ${error.message}`,
+            text: `Failed to use Dataverse prompt: ${error.message}`,
           },
         ],
       };
@@ -792,19 +739,16 @@ server.tool(
   }
 );
 
-// PowerPlatform record tools
-
-// Create record tool
 server.tool(
   "create-record",
-  "Create a new record in a PowerPlatform entity",
+  "Create a new record in a Dataverse entity",
   {
     entityNamePlural: z.string().describe("The plural name of the entity (e.g., 'accounts', 'contacts')"),
     data: z.object({}).passthrough().describe("The record data to create"),
   },
   async ({ entityNamePlural, data }) => {
     try {
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const record = await service.createRecord(entityNamePlural, data);
       
       return {
@@ -829,10 +773,9 @@ server.tool(
   }
 );
 
-// Update record tool
 server.tool(
   "update-record",
-  "Update an existing record in a PowerPlatform entity",
+  "Update an existing record in a Dataverse entity",
   {
     entityNamePlural: z.string().describe("The plural name of the entity (e.g., 'accounts', 'contacts')"),
     recordId: z.string().describe("The GUID of the record to update"),
@@ -840,7 +783,7 @@ server.tool(
   },
   async ({ entityNamePlural, recordId, data }) => {
     try {
-      const service = getPowerPlatformService();
+      const service = getDataverseService();
       const record = await service.updateRecord(entityNamePlural, recordId, data);
       
       return {
@@ -868,7 +811,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Initializing PowerPlatform MCP Server...");
+  console.error("Initializing Dataverse MCP Server...");
 }
 
 main().catch((error) => {

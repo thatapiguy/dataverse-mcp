@@ -1,10 +1,10 @@
 {
-  "name": "powerplatform-mcp",
+  "name": "dataverse-mcp",
   "version": "0.4.5",
-  "description": "PowerPlatform Model Context Protocol server",
+  "description": "Microsoft Dataverse Model Context Protocol server",
   "main": "build/index.js",
   "bin": {
-    "powerplatform-mcp": "build/index.js"
+    "dataverse-mcp": "build/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -17,11 +17,10 @@
     "README.md"
   ],
   "keywords": [
-    "powerplatform",
+    "dataverse",
     "mcp",
     "model-context-protocol",
-    "dynamics",
-    "dataverse"
+    "dynamics"
   ],
   "author": "Michal Sobieraj",
   "license": "MIT",
@@ -31,14 +30,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/michsob/powerplatform-mcp.git"
+    "url": "git+https://github.com/thatapiguy/dataverse-mcp.git"
   },
   "engines": {
     "node": ">=16.0.0"
   },
   "dependencies": {
     "@azure/msal-node": "^3.3.0",
-    "@modelcontextprotocol/sdk": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.11.0",
     "axios": "^1.8.3",
     "zod": "^3.24.2"
   },

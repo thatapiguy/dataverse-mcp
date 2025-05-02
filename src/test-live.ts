@@ -1,14 +1,34 @@
-import { PowerPlatformService, PowerPlatformConfig } from './PowerPlatformService.js';
+import { DataverseService, DataverseConfig } from './DataverseService.js';
+import { config } from 'dotenv';
+
+// Load environment variables from .env file
+config();
 
 async function testLiveEnvironment() {
-  const config: PowerPlatformConfig = {
-    organizationUrl: process.env.POWERPLATFORM_URL || '',
-    clientId: process.env.POWERPLATFORM_CLIENT_ID || '',
-    clientSecret: process.env.POWERPLATFORM_CLIENT_SECRET || '',
-    tenantId: process.env.POWERPLATFORM_TENANT_ID || ''
+  // Validate required environment variables
+  const requiredEnvVars = [
+    'DATAVERSE_URL',
+    'DATAVERSE_CLIENT_ID',
+    'DATAVERSE_CLIENT_SECRET',
+    'DATAVERSE_TENANT_ID'
+  ] as const;
+
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      console.error(`Error: ${envVar} is not set in environment variables`);
+      console.error('Please create a .env file based on .env.template');
+      process.exit(1);
+    }
+  }
+
+  const config: DataverseConfig = {
+    organizationUrl: process.env.DATAVERSE_URL!,
+    clientId: process.env.DATAVERSE_CLIENT_ID!,
+    clientSecret: process.env.DATAVERSE_CLIENT_SECRET!,
+    tenantId: process.env.DATAVERSE_TENANT_ID!
   };
 
-  const service = new PowerPlatformService(config);
+  const service = new DataverseService(config);
 
   try {
     // Create a new account
@@ -17,7 +37,7 @@ async function testLiveEnvironment() {
       name: 'Test Account ' + new Date().toISOString(),
       telephone1: '555-0123',
       emailaddress1: 'test@example.com',
-      description: 'Created by PowerPlatform MCP test'
+      description: 'Created by Dataverse MCP test'
     });
     
     console.log('Created account:', newAccount);
@@ -25,7 +45,7 @@ async function testLiveEnvironment() {
     // Update the account
     console.log('\nUpdating account...');
     const updatedAccount = await service.updateRecord('accounts', newAccount.accountid, {
-      description: 'Updated by PowerPlatform MCP test at ' + new Date().toISOString(),
+      description: 'Updated by Dataverse MCP test at ' + new Date().toISOString(),
       telephone1: '555-9999'
     });
 
